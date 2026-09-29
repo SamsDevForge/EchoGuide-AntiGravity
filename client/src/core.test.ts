@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { directionFor, depthMedian, axialToRange, TRACK_TTL, Tracker } from './vision';
 import { AnnouncementGate,phraseFor } from './audio';
 import type { Observation } from './contracts';

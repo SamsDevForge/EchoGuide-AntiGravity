@@ -61,5 +61,5 @@ export function detect(detector:ObjectDetector,frame:NonNullable<ReturnType<Vide
     const horizontalPosition=Math.min(1,Math.max(0,box.x+box.width/2));
     return [{timestamp:frame.timestamp,label:friendlyLabel(c.categoryName),score:c.score,box,horizontalPosition,direction:directionFor(horizontalPosition),distanceMetres:null,depthSource:'none' as const,depthState:'unavailable' as const}];
   });
-  return {inferenceMs:performance.now()-started,items:tracker.update(items,frame.timestamp)};
+  return {inferenceMs:performance.now()-started,observations:tracker.update(items,frame.timestamp)};
 }
