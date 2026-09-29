@@ -7,16 +7,17 @@ export function phraseFor(o:Observation) {
 }
 export function signature(o:Observation) {return `${o.trackId}:${o.direction}:${o.depthState}:${o.distanceMetres===null?'none':Math.round(o.distanceMetres*2)}`;}
 export class AnnouncementGate {
-  private lastAt=-Infinity; private spoken=new Map<string,string>();
+  private lastAt=-Infinity;
   choose(items:Observation[],now:number,interval:number) {
     const fresh=items.filter(o=>now-o.timestamp<=TRACK_TTL);
-    const ids=new Set(fresh.map(o=>o.trackId)); for(const key of this.spoken.keys())if(!ids.has(key))this.spoken.delete(key);
-    if(now-this.lastAt<interval)return null;
-    const item=fresh.find(o=>this.spoken.get(o.trackId)!==signature(o));
-    if(item){this.lastAt=now;this.spoken.set(item.trackId,signature(item));}return item??null;
+    if(now-this.lastAt<interval || fresh.length===0) return null;
+    // Continuously pick the object closest to the centre of the camera
+    const item=fresh.sort((a,b)=>Math.abs(a.horizontalPosition - 0.5) - Math.abs(b.horizontalPosition - 0.5))[0];
+    this.lastAt=now;
+    return item;
   }
-  reset(){this.lastAt=-Infinity;this.spoken.clear();}
-  forget(trackId:string){this.spoken.delete(trackId);}
+  reset(){this.lastAt=-Infinity;}
+  forget(trackId:string){}
 }
 export class AudioGuide {
   private context:AudioContext|null=null; private oscillator:OscillatorNode|null=null; private timer:ReturnType<typeof setTimeout>|null=null;

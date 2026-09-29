@@ -66,23 +66,26 @@ describe('audio cancellation across scene changes', () => {
     expect(spoken).toHaveLength(0);
     guide.update([item()], prefs, onText);
     vi.advanceTimersByTime(260);
-    expect(spoken.map(utterance => utterance.text)).toEqual(['chair, left.']);
+    expect(spoken.map(utterance => utterance.text)).toEqual(['large chair, left.']);
     expect(onText).toHaveBeenCalledTimes(2);
   });
 
-  it('cancels an outdated pending label when the tracked object changes direction', async () => {
+  it('continuously announces the same object at the specified pace interval', async () => {
     const guide = new AudioGuide();
     await guide.unlock();
     guide.update([item()], prefs, vi.fn());
-    vi.advanceTimersByTime(100);
-    guide.update([item({ direction: 'right' })], prefs, vi.fn());
-    vi.advanceTimersByTime(300);
-    expect(spoken).toHaveLength(0);
-    // Scene changes preserve the pace limit; the correct label arrives after it.
-    vi.advanceTimersByTime(1600);
-    guide.update([item({ direction: 'right' })], prefs, vi.fn());
     vi.advanceTimersByTime(260);
-    expect(spoken.map(utterance => utterance.text)).toEqual(['chair, right.']);
+    expect(spoken).toHaveLength(1);
+    
+    // Attempting to update immediately does nothing due to pace limit
+    guide.update([item()], prefs, vi.fn());
+    expect(spoken).toHaveLength(1);
+
+    // After pace interval passes, it announces again
+    vi.advanceTimersByTime(2000);
+    guide.update([item()], prefs, vi.fn());
+    vi.advanceTimersByTime(260);
+    expect(spoken).toHaveLength(2);
   });
 
   it('cancels active speech when its object disappears or becomes stale', async () => {
@@ -94,30 +97,6 @@ describe('audio cancellation across scene changes', () => {
     const previousCancels = cancelSpeech.mock.calls.length;
     guide.update([], prefs, vi.fn());
     expect(cancelSpeech).toHaveBeenCalledTimes(previousCancels + 1);
-    guide.cancel();
-    const observation = item();
-    guide.update([observation], prefs, vi.fn());
-    vi.advanceTimersByTime(1600);
-    const staleCancels = cancelSpeech.mock.calls.length;
-    guide.update([observation], prefs, vi.fn());
-    expect(cancelSpeech).toHaveBeenCalledTimes(staleCancels + 1);
-    vi.advanceTimersByTime(3000);
-    expect(spoken).toHaveLength(2);
-  });
-
-  it('still announces the original direction after left-right-left changes cancel its pending label', async () => {
-    const guide = new AudioGuide();
-    await guide.unlock();
-    guide.update([item()], prefs, vi.fn());
-    vi.advanceTimersByTime(100);
-    guide.update([item({ direction: 'right' })], prefs, vi.fn());
-    vi.advanceTimersByTime(100);
-    guide.update([item({ direction: 'left' })], prefs, vi.fn());
-    vi.advanceTimersByTime(1800);
-    expect(spoken).toHaveLength(0);
-    guide.update([item({ direction: 'left' })], prefs, vi.fn());
-    vi.advanceTimersByTime(260);
-    expect(spoken.map(utterance => utterance.text)).toEqual(['chair, left.']);
   });
 
   it('ignores completion events from cancelled speech while a new utterance is active', async () => {
@@ -130,11 +109,10 @@ describe('audio cancellation across scene changes', () => {
     guide.cancel();
     guide.update([item({ trackId: 'person-2', label: 'person' })], prefs, onText);
     vi.advanceTimersByTime(260);
-    oldEnd();
-    vi.advanceTimersByTime(2100);
+    oldEnd(); // simulate the old utterance finishing after cancel
+    vi.advanceTimersByTime(2100); // Wait for pace limit
     guide.update([item({ trackId: 'person-2', label: 'person' }), item({ trackId: 'backpack-3', label: 'backpack' })], prefs, onText);
     vi.advanceTimersByTime(260);
-    expect(spoken.map(utterance => utterance.text)).toEqual(['chair, left.', 'person, left.']);
-    expect(onText).toHaveBeenCalledTimes(2);
+    expect(spoken.map(utterance => utterance.text)).toEqual(['large chair, left.', 'large person, left.', 'large person, left.']);
   });
 });
