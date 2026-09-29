@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: echoguide-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build -w server
+    startCommand: npm run start -w server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

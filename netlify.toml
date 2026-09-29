@@ -1,0 +1,10 @@
+[build]
+  command = "npm ci && npm run models && npm run build -w client"
+  publish = "client/dist"
+[build.environment]
+  NODE_VERSION = "22"
+  VITE_STATIC_MODE = "true"
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

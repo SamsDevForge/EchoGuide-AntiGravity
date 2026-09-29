@@ -1,0 +1,1 @@
+{"buildCommand":"npm run models && npm run build -w client","outputDirectory":"client/dist","framework":"vite","rewrites":[{"source":"/((?!assets/|vision/|models/).*)","destination":"/index.html"}],"env":{"VITE_STATIC_MODE":"true"}}

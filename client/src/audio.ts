@@ -1,0 +1,39 @@
+import type { Observation, Preferences, Direction } from './contracts';
+import { TRACK_TTL } from './vision';
+export function phraseFor(o:Observation) {return `${o.label}, ${o.direction}${o.depthState==='valid'&&o.distanceMetres!==null?`, about ${(Math.round(o.distanceMetres*2)/2).toFixed(1)} metres`:''}.`;}
+export function signature(o:Observation) {return `${o.trackId}:${o.direction}:${o.depthState}:${o.distanceMetres===null?'none':Math.round(o.distanceMetres*2)}`;}
+export class AnnouncementGate {
+  private lastAt=-Infinity; private spoken=new Map<string,string>();
+  choose(items:Observation[],now:number,interval:number) {
+    const fresh=items.filter(o=>now-o.timestamp<=TRACK_TTL);
+    const ids=new Set(fresh.map(o=>o.trackId)); for(const key of this.spoken.keys())if(!ids.has(key))this.spoken.delete(key);
+    if(now-this.lastAt<interval)return null;
+    const item=fresh.find(o=>this.spoken.get(o.trackId)!==signature(o));
+    if(item){this.lastAt=now;this.spoken.set(item.trackId,signature(item));}return item??null;
+  }
+  reset(){this.lastAt=-Infinity;this.spoken.clear();}
+  forget(trackId:string){this.spoken.delete(trackId);}
+}
+export class AudioGuide {
+  private context:AudioContext|null=null; private oscillator:OscillatorNode|null=null; private timer:ReturnType<typeof setTimeout>|null=null;
+  private generation=0; private busy=false; private activeTrack:string|null=null; private activeSignature:string|null=null;
+  gate=new AnnouncementGate();
+  async unlock(){this.context??=new AudioContext();await this.context.resume();}
+  tone(direction:Direction,prefs:Preferences) {
+    if(!this.context||this.context.state!=='running')return;
+    this.oscillator?.stop();
+    const ctx=this.context;const osc=ctx.createOscillator();const gain=ctx.createGain();const x=direction==='left'?-1:direction==='right'?1:0;
+    if(prefs.spatialMode==='hrtf'){const pan=ctx.createPanner();pan.panningModel='HRTF';pan.positionX.value=x;pan.positionZ.value=-1;osc.connect(gain).connect(pan).connect(ctx.destination);}
+    else {const pan=ctx.createStereoPanner();pan.pan.value=x;osc.connect(gain).connect(pan).connect(ctx.destination);}
+    osc.frequency.value=direction==='centre'?660:520;gain.gain.setValueAtTime(0,ctx.currentTime);gain.gain.linearRampToValueAtTime(prefs.volume*.22,ctx.currentTime+.02);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.2);osc.start();osc.stop(ctx.currentTime+.22);this.oscillator=osc;osc.onended=()=>{osc.disconnect();gain.disconnect();if(this.oscillator===osc)this.oscillator=null;};
+  }
+  say(item:Observation,prefs:Preferences,onText:(text:string)=>void) {
+    this.cancel(false);this.busy=true;this.activeTrack=item.trackId;this.activeSignature=signature(item);const generation=this.generation;this.tone(item.direction,prefs);const phrase=phraseFor(item);onText(phrase);
+    this.timer=setTimeout(()=>{if(generation!==this.generation)return;if(!('speechSynthesis' in window)){this.busy=false;return;}const utterance=new SpeechSynthesisUtterance(phrase);utterance.volume=prefs.volume;utterance.rate=1;utterance.onend=utterance.onerror=()=>{if(generation===this.generation)this.busy=false;};window.speechSynthesis.speak(utterance);},260);
+  }
+  update(items:Observation[],prefs:Preferences,onText:(text:string)=>void) {
+    if(this.activeTrack&&!items.some(o=>o.trackId===this.activeTrack&&signature(o)===this.activeSignature&&performance.now()-o.timestamp<=TRACK_TTL)) this.cancel(false);
+    if(this.busy)return;const item=this.gate.choose(items,performance.now(),prefs.announcementIntervalMs);if(item)this.say(item,prefs,onText);
+  }
+  cancel(reset=true){if(this.busy&&this.activeTrack)this.gate.forget(this.activeTrack);this.generation++;if(this.timer)clearTimeout(this.timer);this.timer=null;this.oscillator?.stop();this.oscillator=null;window.speechSynthesis?.cancel();this.busy=false;this.activeTrack=null;this.activeSignature=null;if(reset)this.gate.reset();}
+}

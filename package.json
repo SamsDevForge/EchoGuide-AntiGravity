@@ -1,0 +1,14 @@
+{
+  "name": "echoguide", "version": "0.1.0", "private": true,
+  "workspaces": ["client", "server"],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
+    "start": "npm run start -w server",
+    "models": "node scripts/prepare-assets.mjs"
+  },
+  "devDependencies": {"concurrently": "^9.2.1"},
+  "engines": {"node": ">=22"}
+}
