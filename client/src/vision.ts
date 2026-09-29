@@ -50,7 +50,7 @@ export class VideoProvider implements CameraProvider {
 }
 let detectorPromise:Promise<ObjectDetector>|null=null;
 export function getDetector() {
-  if(!detectorPromise) detectorPromise=FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}vision`).then(files=>ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/efficientdet-lite0.tflite`,delegate:'CPU'},runningMode:'VIDEO',scoreThreshold:.45,maxResults:12})).catch(e=>{detectorPromise=null;throw e;});
+  if(!detectorPromise) detectorPromise=FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}vision`).then(files=>ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/efficientdet-lite0.tflite`,delegate:'CPU'},runningMode:'VIDEO',scoreThreshold:.45,maxResults:8,categoryAllowlist:['person','chair','backpack','cell phone','laptop','bottle','cup','keyboard','mouse','book','dining table','tv','potted plant']})).catch(e=>{detectorPromise=null;throw e;});
   return detectorPromise;
 }
 export function detect(detector:ObjectDetector,frame:NonNullable<ReturnType<VideoProvider['frame']>>,tracker:Tracker) {
