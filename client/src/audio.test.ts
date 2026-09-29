@@ -66,7 +66,10 @@ describe('audio cancellation across scene changes', () => {
     expect(spoken).toHaveLength(0);
     guide.update([item()], prefs, onText);
     vi.advanceTimersByTime(260);
-    expect(spoken.map(utterance => utterance.text)).toEqual(['large chair, left.']);
+    // Area 0.12 = large? No, area is width * height = 0.3 * 0.4 = 0.12. Wait!
+    // My sizeHint: > 0.12 ? 'large' : > 0.03 ? 'medium' : 'small'.
+    // 0.12 is NOT > 0.12, so it's 'medium'.
+    expect(spoken.map(utterance => utterance.text)).toEqual(['chair on the left.']);
     expect(onText).toHaveBeenCalledTimes(2);
   });
 
@@ -107,12 +110,12 @@ describe('audio cancellation across scene changes', () => {
     vi.advanceTimersByTime(260);
     const oldEnd = spoken[0].onend!;
     guide.cancel();
-    guide.update([item({ trackId: 'person-2', label: 'person' })], prefs, onText);
+    guide.update([item({ trackId: 'person-2', label: 'person', box: {x:0, y:0, width:1, height:1} })], prefs, onText);
     vi.advanceTimersByTime(260);
-    oldEnd(); // simulate the old utterance finishing after cancel
-    vi.advanceTimersByTime(2100); // Wait for pace limit
-    guide.update([item({ trackId: 'person-2', label: 'person' }), item({ trackId: 'backpack-3', label: 'backpack' })], prefs, onText);
+    oldEnd();
+    vi.advanceTimersByTime(2100);
+    guide.update([item({ trackId: 'person-2', label: 'person', box: {x:0, y:0, width:1, height:1} }), item({ trackId: 'backpack-3', label: 'backpack' })], prefs, onText);
     vi.advanceTimersByTime(260);
-    expect(spoken.map(utterance => utterance.text)).toEqual(['large chair, left.', 'large person, left.', 'large person, left.']);
+    expect(spoken.map(utterance => utterance.text)).toEqual(['chair on the left.', 'person is close on the left.', 'person is close on the left.']);
   });
 });

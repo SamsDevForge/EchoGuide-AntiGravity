@@ -2,8 +2,24 @@ import type { Observation, Preferences, Direction } from './contracts';
 import { TRACK_TTL, sizeHint } from './vision';
 export function phraseFor(o:Observation) {
   const size = sizeHint(o.box);
-  const sizePrefix = size !== 'medium' ? `${size} ` : '';
-  return `${sizePrefix}${o.label}, ${o.direction}${o.depthState==='valid'&&o.distanceMetres!==null?`, about ${(Math.round(o.distanceMetres*2)/2).toFixed(1)} metres`:''}.`;
+  let phrase = '';
+  
+  if (o.label === 'object') {
+    // For generic objects (the other 67 COCO classes)
+    const prefix = size === 'large' ? 'big ' : size === 'small' ? 'small ' : 'medium ';
+    phrase = `${prefix}object on the ${o.direction}`;
+  } else {
+    // For specific known objects
+    const closeText = size === 'large' ? ' is close' : size === 'small' ? ' is far' : '';
+    const dirText = o.direction === 'centre' ? 'in the centre' : `on the ${o.direction}`;
+    phrase = `${o.label}${closeText} ${dirText}`;
+  }
+  
+  if (o.depthState === 'valid' && o.distanceMetres !== null) {
+    phrase += `, about ${(Math.round(o.distanceMetres*2)/2).toFixed(1)} metres`;
+  }
+  
+  return phrase + '.';
 }
 export function signature(o:Observation) {return `${o.trackId}:${o.direction}:${o.depthState}:${o.distanceMetres===null?'none':Math.round(o.distanceMetres*2)}`;}
 export class AnnouncementGate {
@@ -37,11 +53,10 @@ export class AudioGuide {
     this.timer=setTimeout(()=>{if(generation!==this.generation)return;if(!('speechSynthesis' in window)){this.busy=false;return;}const utterance=new SpeechSynthesisUtterance(phrase);utterance.volume=prefs.volume;utterance.rate=1;utterance.onend=utterance.onerror=()=>{if(generation===this.generation)this.busy=false;};window.speechSynthesis.speak(utterance);},260);
   }
   update(items:Observation[],prefs:Preferences,onText:(text:string)=>void) {
-    // Only cancel speech when the tracked object disappears entirely — not on direction/signature changes.
+    // Only cancel speech when the tracked object disappears entirely ?" not on direction/signature changes.
     // This prevents speech from being cut off mid-word every detection frame.
     if(this.activeTrack&&!items.some(o=>o.trackId===this.activeTrack&&performance.now()-o.timestamp<=TRACK_TTL)) this.cancel(false);
     if(this.busy)return;const item=this.gate.choose(items,performance.now(),prefs.announcementIntervalMs);if(item)this.say(item,prefs,onText);
   }
   cancel(reset=true){if(this.busy&&this.activeTrack)this.gate.forget(this.activeTrack);this.generation++;if(this.timer)clearTimeout(this.timer);this.timer=null;this.oscillator?.stop();this.oscillator=null;window.speechSynthesis?.cancel();this.busy=false;this.activeTrack=null;this.activeSignature=null;if(reset)this.gate.reset();}
 }
-
