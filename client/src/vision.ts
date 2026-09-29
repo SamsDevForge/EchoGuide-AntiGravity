@@ -10,6 +10,18 @@ export const depthMedian = (samples:number[]):number|null => {
   return deviations[Math.floor(deviations.length/2)] > Math.max(0.12,med*0.12) || valid[Math.floor(valid.length*0.8)]-valid[Math.floor(valid.length*0.2)] > Math.max(.3,med*.3) ? null : med;
 };
 export const axialToRange = (z:number,x:number,y:number):number => z*Math.sqrt(1+x*x+y*y);
+const FRIENDLY:Record<string,string> = {
+  'potted plant':'plant','dining table':'table','cell phone':'phone',
+  'wine glass':'glass','sports ball':'ball','baseball bat':'bat',
+  'baseball glove':'glove','fire hydrant':'hydrant','parking meter':'meter',
+  'stop sign':'sign','hair drier':'dryer','teddy bear':'teddy',
+  'traffic light':'light','hot dog':'hotdog',
+};
+export const friendlyLabel = (raw:string):string => FRIENDLY[raw] ?? raw;
+export const sizeHint = (box:Box):'small'|'medium'|'large' => {
+  const area = box.width * box.height;
+  return area > 0.12 ? 'large' : area > 0.03 ? 'medium' : 'small';
+};
 export function iou(a:Box,b:Box) { const w=Math.max(0,Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x));const h=Math.max(0,Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y));return w*h/(a.width*a.height+b.width*b.height-w*h || 1); }
 export class Tracker {
   private tracks:Observation[]=[]; private serial=0;
@@ -38,7 +50,7 @@ export class VideoProvider implements CameraProvider {
 }
 let detectorPromise:Promise<ObjectDetector>|null=null;
 export function getDetector() {
-  if(!detectorPromise) detectorPromise=FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}vision`).then(files=>ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/efficientdet-lite0.tflite`,delegate:'CPU'},runningMode:'VIDEO',scoreThreshold:.5,maxResults:8,categoryAllowlist:['person','chair','backpack']})).catch(e=>{detectorPromise=null;throw e;});
+  if(!detectorPromise) detectorPromise=FilesetResolver.forVisionTasks(`${import.meta.env.BASE_URL}vision`).then(files=>ObjectDetector.createFromOptions(files,{baseOptions:{modelAssetPath:`${import.meta.env.BASE_URL}models/efficientdet-lite0.tflite`,delegate:'CPU'},runningMode:'VIDEO',scoreThreshold:.45,maxResults:12})).catch(e=>{detectorPromise=null;throw e;});
   return detectorPromise;
 }
 export function detect(detector:ObjectDetector,frame:NonNullable<ReturnType<VideoProvider['frame']>>,tracker:Tracker) {
@@ -48,7 +60,7 @@ export function detect(detector:ObjectDetector,frame:NonNullable<ReturnType<Vide
     const b=d.boundingBox;const c=d.categories[0];if(!b||!c) return [];
     const box={x:b.originX/frame.width,y:b.originY/frame.height,width:b.width/frame.width,height:b.height/frame.height};
     const horizontalPosition=Math.min(1,Math.max(0,box.x+box.width/2));
-    return [{timestamp:frame.timestamp,label:c.categoryName,score:c.score,box,horizontalPosition,direction:directionFor(horizontalPosition),distanceMetres:null,depthSource:'none' as const,depthState:'unavailable' as const}];
+    return [{timestamp:frame.timestamp,label:friendlyLabel(c.categoryName),score:c.score,box,horizontalPosition,direction:directionFor(horizontalPosition),distanceMetres:null,depthSource:'none' as const,depthState:'unavailable' as const}];
   });
   return {observations:tracker.update(items,frame.timestamp),inferenceMs:performance.now()-started};
 }
